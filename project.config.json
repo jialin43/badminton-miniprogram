@@ -1,0 +1,18 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "badminton-grouper",
+  "description": "羽六 · 羽毛球接龙分组海报",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": false,
+    "compileHotReLoad": false,
+    "postcss": false,
+    "minified": false
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.5.5",
+  "srcMiniprogramRoot": "dist/",
+  "condition": {}
+}

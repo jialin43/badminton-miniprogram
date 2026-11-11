@@ -1,0 +1,324 @@
+/* ============================================================
+   设计令牌
+   小程序用 rpx（750 设计稿），保留原 Web 版的色彩体系，
+   尺寸统一换成 rpx。
+   ============================================================ */
+
+/* 变量要同时挂在 :root 和 page 上：
+   小程序页面根节点是 page，但组件内部节点不一定继承得到，
+   双写可以覆盖 H5 与小程序两种运行时。 */
+:root,
+page {
+  --ink: #0e2a1f;
+  --ink-soft: #173d2d;
+  --green: #1c5a41;
+  --lime: #d9f36b;
+  --lime-deep: #b8d94a;
+  --cream: #f4f1e6;
+  --paper: #fbf9f2;
+  --paper-deep: #f0ecdf;
+  --white: #fffdf8;
+  --rose: #d94f73;
+  --muted: #6d786f;
+  --muted-2: #8b948c;
+  --line: rgba(14, 42, 31, 0.1);
+  --line-strong: rgba(14, 42, 31, 0.16);
+  --danger: #c9484d;
+
+  background: var(--cream);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+    sans-serif;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+page {
+  background: #f4f1e6;
+}
+
+view,
+text,
+button,
+input,
+textarea,
+scroll-view {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   通用容器
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-content {
+  flex: 1;
+  padding: 0 24rpx;
+}
+
+.page-content--with-bar {
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  background: var(--paper);
+  border-radius: 32rpx;
+  padding: 32rpx;
+  box-shadow: 0 12rpx 32rpx rgba(14, 42, 31, 0.06);
+}
+
+.section-kicker {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--muted-2);
+  text-transform: uppercase;
+  margin-bottom: 8rpx;
+}
+
+.panel-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 24rpx;
+}
+
+/* ============================================================
+   按钮
+   小程序/ H5 的 button 有默认宽度、边框和外边距，
+   这里统一归零，否则会把 flex 布局撑乱。
+   ============================================================ */
+
+.btn,
+.tool-button,
+.move-option,
+.sheet-close {
+  width: auto;
+  margin: 0;
+  font-family: inherit;
+  line-height: 1.2;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  height: 88rpx;
+  padding: 0 32rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: none;
+  line-height: 1.2;
+}
+
+.btn::after {
+  border: none;
+}
+
+.btn--primary {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.btn--dark {
+  background: var(--ink);
+  color: var(--lime);
+}
+
+.btn--soft {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1rpx solid var(--line-strong);
+}
+
+.btn--danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--disabled {
+  opacity: 0.45;
+}
+
+.btn--sm {
+  height: 64rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+
+.tool-button {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  height: 68rpx;
+  padding: 0 26rpx;
+  border-radius: 999rpx;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 26rpx;
+  font-weight: 700;
+  border: 1rpx solid var(--line);
+}
+
+.tool-button--primary {
+  background: var(--ink);
+  color: var(--lime);
+  border-color: var(--ink);
+}
+
+.tool-button--danger {
+  color: var(--danger);
+}
+
+.tool-button--disabled {
+  /* 只淡化背景和文字颜色，保留结构可读性，避免整块发灰看不清 */
+  background: rgba(14, 42, 31, 0.05);
+  color: rgba(14, 42, 31, 0.34);
+  border-color: rgba(14, 42, 31, 0.08);
+}
+
+.tool-button--primary.tool-button--disabled {
+  background: rgba(14, 42, 31, 0.16);
+  color: rgba(247, 243, 230, 0.55);
+  border-color: transparent;
+}
+
+/* ============================================================
+   统计条
+   ============================================================ */
+
+.stats {
+  display: flex;
+  background: var(--paper);
+  border-radius: 24rpx;
+  padding: 24rpx 0;
+  margin: 20rpx 0;
+  box-shadow: 0 8rpx 24rpx rgba(14, 42, 31, 0.05);
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  position: relative;
+}
+
+.stat + .stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 1rpx;
+  background: var(--line);
+}
+
+.stat__value {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.stat__label {
+  font-size: 22rpx;
+  color: var(--muted-2);
+}
+
+/* ============================================================
+   空状态
+   ============================================================ */
+
+.empty {
+  background: var(--paper);
+  border-radius: 32rpx;
+  padding: 64rpx 40rpx;
+  text-align: center;
+  margin: 24rpx 0;
+}
+
+.empty__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  margin: 16rpx 0 12rpx;
+}
+
+.empty__text {
+  display: block;
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   底部操作栏
+   ============================================================ */
+
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(251, 249, 242, 0.97);
+  border-top: 1rpx solid var(--line);
+  z-index: 50;
+}
+
+.action-bar__hint {
+  display: block;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted-2);
+  margin-bottom: 12rpx;
+}
+
+.action-bar__row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.action-bar__row .btn {
+  flex: 1;
+}
+
+.action-bar__secondary {
+  flex: 0 0 28% !important;
+}

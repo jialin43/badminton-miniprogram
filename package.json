@@ -1,0 +1,55 @@
+{
+  "name": "badminton-miniprogram",
+  "version": "1.0.0",
+  "private": true,
+  "description": "羽六 · 羽毛球接龙分组海报（微信小程序版）",
+  "templateInfo": {
+    "name": "default",
+    "typescript": true,
+    "css": "sass",
+    "framework": "react"
+  },
+  "browserslist": [
+    "last 3 versions",
+    "Android >= 4.1",
+    "ios >= 8"
+  ],
+  "scripts": {
+    "build:weapp": "taro build --type weapp",
+    "build:h5": "taro build --type h5",
+    "dev:weapp": "npm run build:weapp -- --watch",
+    "dev:h5": "npm run build:h5 -- --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.24.4",
+    "@tarojs/components": "4.3.2",
+    "@tarojs/helper": "4.3.2",
+    "@tarojs/plugin-framework-react": "4.3.2",
+    "@tarojs/plugin-platform-weapp": "4.3.2",
+    "@tarojs/react": "4.3.2",
+    "@tarojs/runtime": "4.3.2",
+    "@tarojs/shared": "4.3.2",
+    "@tarojs/taro": "4.3.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.13",
+    "@babel/preset-env": "^7.29.7",
+    "@babel/preset-react": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
+    "@tarojs/cli": "4.3.2",
+    "@tarojs/plugin-platform-h5": "^4.3.2",
+    "@tarojs/webpack5-runner": "4.3.2",
+    "@types/react": "^18.3.12",
+    "@types/webpack-env": "^1.18.5",
+    "babel-preset-taro": "4.3.2",
+    "sass": "^1.107.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9",
+    "webpack": "5.91.0"
+  }
+}

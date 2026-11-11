@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.taro-home/
+.swc/
+*.log
+.DS_Store
