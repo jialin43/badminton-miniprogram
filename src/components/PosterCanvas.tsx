@@ -4,6 +4,7 @@ import Taro from '@tarojs/taro';
 import type { PosterLayout } from '@/lib/poster-layout';
 import { renderPoster } from '@/lib/poster-render';
 import type { PosterData } from '@/lib/poster-render';
+import type { CanvasNode } from '@/lib/export';
 
 interface PosterCanvasProps {
   data: PosterData;
@@ -11,12 +12,11 @@ interface PosterCanvasProps {
   canvasId: string;
   /** 渲染完成回调，用于触发保存等后续操作 */
   onRendered?: (canvasId: string) => void;
-}
-
-interface CanvasNode {
-  width: number;
-  height: number;
-  getContext: (type: '2d') => CanvasRenderingContext2D | null;
+  /**
+   * 把画布节点实例交给父组件。
+   * Canvas 2D 导出 canvasToTempFilePath 必须带这个实例，否则找不到画布。
+   */
+  onNodeReady?: (node: CanvasNode | null) => void;
 }
 
 /**
@@ -32,6 +32,7 @@ export function PosterCanvas({
   layout,
   canvasId,
   onRendered,
+  onNodeReady,
 }: PosterCanvasProps) {
   const nodeRef = useRef<CanvasNode | null>(null);
   const [display, setDisplay] = useState({ width: 0, height: 0 });
@@ -68,6 +69,7 @@ export function PosterCanvas({
           }
 
           nodeRef.current = node;
+          onNodeReady?.(node);
           resolve(node);
         });
     });
@@ -96,6 +98,7 @@ export function PosterCanvas({
       if (cancelled) return;
 
       if (!node) {
+        onNodeReady?.(null);
         attempt += 1;
         if (attempt < 5) {
           setTimeout(() => void run(), 120 * attempt);
@@ -110,7 +113,7 @@ export function PosterCanvas({
     return () => {
       cancelled = true;
     };
-  }, [draw, setupCanvas]);
+  }, [draw, onNodeReady, setupCanvas]);
 
   // 数据变化（改名、挪人）时重绘
   useEffect(() => {

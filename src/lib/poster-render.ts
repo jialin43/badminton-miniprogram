@@ -7,6 +7,8 @@ import { formatNumericCN, formatShortCN, formatTimeRange } from './date';
 export type PosterCtx = CanvasRenderingContext2D;
 import { showRoseBadge } from './player';
 import type { PosterLayout } from './poster-layout';
+import type { PosterPalette } from './poster-theme';
+import { getTheme } from './poster-theme';
 
 export interface PosterPlayerData {
   name: string;
@@ -30,23 +32,13 @@ export interface PosterData {
   waitlist: PosterPlayerData[];
   totalPlayers: number;
   femaleCount: number;
+  /** 主题 id；缺省用默认主题，兼容旧状态 */
+  themeId?: string;
 }
 
 // 小程序 Canvas 走系统字体，只写一个泛指字体族最稳；写多个反而可能整串失效。
 const FONT_STACK = 'sans-serif';
 const EMOJI_FONT = 'sans-serif';
-
-const INK = '#0e2a1f';
-const CREAM = '#f7f3e6';
-const LIME = '#d9f36b';
-const CARD_TEXT = '#14271f';
-const CARD_MUTED = '#7c847a';
-const CARD_FILL = '#f7f3e6';
-const CELL_FILL = '#ece7d7';
-/** 女生格子底色：与卡片米色区分，但比 🌹 更柔和，不抢名字。 */
-const CELL_FILL_FEMALE = '#fad9dc';
-/** 女生格子描边，让粉色在白底卡片上更清晰。 */
-const CELL_STROKE_FEMALE = 'rgba(199, 96, 112, 0.42)';
 
 function setFont(
   ctx: PosterCtx,
@@ -82,8 +74,8 @@ function drawSpacedText(
   y: number,
   spacing: number,
   size: number,
-  weight = 600,
-  color = LIME,
+  weight: number,
+  color: string,
 ): number {
   setFont(ctx, size, weight);
   ctx.fillStyle = color;
@@ -196,97 +188,76 @@ function fitName(
 }
 
 /**
- * 画一朵矢量玫瑰。
+ * 画 🌹 女生标记。
  *
- * 小程序 Canvas 的 fillText 对彩色 emoji 支持不稳定（容易被渲染成黑白方块），
- * 因此用路径手绘，保证任何机型上都是同一朵粉色玫瑰。
+ * 与界面保持一致：界面用的是 emoji 字形 🌹，
+ * 海报早期版本手绘矢量玫瑰（带花茎叶片），观感像“一朵花”，
+ * 与卡片上的 emoji 不是同一个东西。这里改回同字形，
+ * 保证「界面上看到的」和「海报上印的」是同一个图标。
+ *
+ * 风险兜底：极少数机型 Canvas 的 fillText 不出彩色 emoji，
+ * 会退化成黑白轮廓。用 measureText 探测字形宽度，宽度异常
+ * （字体缺字时通常接近 0 或等于 fallback 宽度）才退回矢量绘制。
  */
 function drawRose(
   ctx: PosterCtx,
+  palette: PosterPalette,
   x: number,
   baseline: number,
   size = 22,
 ): number {
-  const width = size * 1.06;
-  const cx = x + width / 2;
-  const cy = baseline - size * 0.34;
-  const r = size * 0.42;
+  const GLYPH = '🌹';
 
   ctx.save();
+  setFont(ctx, size, 400, EMOJI_FONT);
+  const width = ctx.measureText(GLYPH).width;
 
-  // 花蕾：三层花瓣逐层收紧，形成玫瑰的卷心
-  const petals: Array<[number, string]> = [
-    [1, '#c8436a'],
-    [0.74, '#e0698d'],
-    [0.46, '#f3a8bd'],
-  ];
-
-  for (const [scale, color] of petals) {
-    const rr = r * scale;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    // 用四个错位的圆弧拼出花瓣层次
-    ctx.arc(cx, cy, rr, Math.PI * 0.15, Math.PI * 1.25);
-    ctx.arc(cx, cy - rr * 0.18, rr * 0.82, Math.PI * 1.05, Math.PI * 2.1);
-    ctx.closePath();
-    ctx.fill();
+  // 字形缺失：宽度接近 0 或远超字号（缺字 fallback 渲染成方块）
+  if (width > size * 0.2 && width < size * 2.2) {
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(GLYPH, x, baseline);
+    ctx.restore();
+    return width;
   }
-
-  // 高光，让花朵有体积感
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.beginPath();
-  ctx.arc(cx - r * 0.24, cy - r * 0.3, r * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 花萼与花茎
-  ctx.fillStyle = '#4f8a4a';
-  ctx.beginPath();
-  ctx.moveTo(cx - r * 0.62, cy + r * 0.55);
-  ctx.quadraticCurveTo(cx, cy + r * 1.15, cx + r * 0.62, cy + r * 0.55);
-  ctx.quadraticCurveTo(cx, cy + r * 0.72, cx - r * 0.62, cy + r * 0.55);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = '#4f8a4a';
-  ctx.lineWidth = Math.max(1.4, size * 0.09);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx, cy + r * 0.92);
-  ctx.lineTo(cx, cy + r * 1.5);
-  ctx.stroke();
-
-  // 叶片
-  ctx.fillStyle = '#5b9c52';
-  ctx.beginPath();
-  ctx.ellipse(
-    cx + r * 0.42,
-    cy + r * 1.16,
-    r * 0.42,
-    r * 0.2,
-    -0.5,
-    0,
-    Math.PI * 2,
-  );
-  ctx.fill();
 
   ctx.restore();
 
-  return width;
+  // —— 兜底：字形不可用时用简洁的粉色玫瑰形圆点，避免整图缺失标记 ——
+  const r = size * 0.38;
+  const cx = x + r;
+  const cy = baseline - size * 0.3;
+
+  ctx.save();
+  ctx.fillStyle = palette.rose;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  return r * 2;
 }
 
 function drawBackground(
   ctx: PosterCtx,
   layout: PosterLayout,
+  palette: PosterPalette,
 ): void {
   const gradient = ctx.createLinearGradient(0, 0, layout.width, layout.height);
-  gradient.addColorStop(0, '#0b241a');
-  gradient.addColorStop(0.55, '#0e2a1f');
-  gradient.addColorStop(1, '#12382a');
+  gradient.addColorStop(0, palette.bgStart);
+  gradient.addColorStop(0.55, palette.bgMid);
+  gradient.addColorStop(1, palette.bgEnd);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, layout.width, layout.height);
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(217, 243, 107, 0.055)';
+  ctx.strokeStyle = palette.bgLine;
   ctx.lineWidth = 2;
   ctx.strokeRect(42, 42, layout.width - 84, layout.height - 84);
 
@@ -301,7 +272,7 @@ function drawBackground(
   ctx.arc(layout.width * 0.86, 190, 250, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(217, 243, 107, 0.09)';
+  ctx.strokeStyle = palette.accentFaint;
   ctx.beginPath();
   ctx.arc(layout.width * 0.86, 190, 176, 0, Math.PI * 2);
   ctx.stroke();
@@ -311,7 +282,7 @@ function drawBackground(
   ctx.save();
   ctx.translate(902, 156);
   ctx.rotate(-0.18);
-  ctx.strokeStyle = 'rgba(217, 243, 107, 0.22)';
+  ctx.strokeStyle = palette.accentSoft;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
 
@@ -336,11 +307,12 @@ function drawHeader(
   ctx: PosterCtx,
   data: PosterData,
   layout: PosterLayout,
+  palette: PosterPalette,
 ): void {
   const { header, padding } = layout;
   const maxWidth = layout.width - padding * 2;
 
-  ctx.fillStyle = LIME;
+  ctx.fillStyle = palette.accent;
   roundedRect(ctx, padding, header.eyebrowY - 18, 12, 12, 3);
   ctx.fill();
 
@@ -352,9 +324,10 @@ function drawHeader(
     3.2,
     22,
     700,
+    palette.accent,
   );
 
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.44)';
+  ctx.fillStyle = palette.onBgFaint;
   ctx.fillRect(
     padding + 24 + eyebrowWidth + 18,
     header.eyebrowY - 8,
@@ -363,7 +336,7 @@ function drawHeader(
   );
 
   setFont(ctx, 20, 500);
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.56)';
+  ctx.fillStyle = palette.onBgMuted;
   ctx.fillText(
     '羽球分组',
     padding + 24 + eyebrowWidth + 66,
@@ -372,7 +345,7 @@ function drawHeader(
 
   const title = fitTitle(ctx, data.title || '羽毛球分组', maxWidth);
   setFont(ctx, title.size, 800);
-  ctx.fillStyle = CREAM;
+  ctx.fillStyle = palette.onBg;
   ctx.textAlign = 'left';
   title.lines.forEach((line, index) => {
     ctx.fillText(line, padding, header.titleY + index * header.titleLineHeight);
@@ -385,16 +358,16 @@ function drawHeader(
   const pillHeight = 44;
   const pillY = header.metaY - 32;
 
-  ctx.fillStyle = LIME;
+  ctx.fillStyle = palette.accent;
   roundedRect(ctx, padding, pillY, pillWidth, pillHeight, 22);
   ctx.fill();
 
   setFont(ctx, 28, 800);
-  ctx.fillStyle = INK;
+  ctx.fillStyle = palette.bgMid;
   ctx.fillText(dateLabel, padding + 22, header.metaY);
 
   setFont(ctx, 30, 600);
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.9)';
+  ctx.fillStyle = palette.onBg;
   ctx.fillText(
     formatTimeRange(data.startTime, data.endTime),
     padding + pillWidth + 22,
@@ -402,7 +375,7 @@ function drawHeader(
   );
 
   setFont(ctx, 26, 500);
-  ctx.strokeStyle = 'rgba(247, 243, 230, 0.52)';
+  ctx.strokeStyle = palette.onBgMuted;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(padding + 8, header.venueY - 9, 7, 0, Math.PI * 2);
@@ -412,14 +385,14 @@ function drawHeader(
   ctx.lineTo(padding + 8, header.venueY + 8);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.68)';
+  ctx.fillStyle = palette.onBgMuted;
   ctx.fillText(
     truncateText(ctx, data.venue || '场地待定', maxWidth - 32),
     padding + 28,
     header.venueY,
   );
 
-  ctx.strokeStyle = 'rgba(247, 243, 230, 0.13)';
+  ctx.strokeStyle = palette.bgLine;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(padding, 430);
@@ -433,6 +406,7 @@ function drawCard(
   layout: PosterLayout,
   cardIndex: number,
   capacity: number,
+  palette: PosterPalette,
 ): void {
   const card = layout.cards[cardIndex];
   if (!card) return;
@@ -441,7 +415,7 @@ function drawCard(
   ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
   ctx.shadowBlur = 24;
   ctx.shadowOffsetY = 8;
-  ctx.fillStyle = CARD_FILL;
+  ctx.fillStyle = palette.cardFill;
   roundedRect(ctx, card.x, card.y, card.w, card.h, 26);
   ctx.fill();
   ctx.restore();
@@ -470,12 +444,12 @@ function drawCard(
   const countY = card.y + 23;
   const capRadius = countHeight / 2;
 
-  ctx.fillStyle = LIME;
+  ctx.fillStyle = palette.accent;
   roundedRect(ctx, card.x + padding, card.y + 28, 10, 34, 5);
   ctx.fill();
 
   setFont(ctx, 36, 800);
-  ctx.fillStyle = CARD_TEXT;
+  ctx.fillStyle = palette.cardText;
   ctx.textAlign = 'left';
   const labelMax = card.w - padding * 2 - countWidth - 34;
   ctx.fillText(
@@ -484,7 +458,7 @@ function drawCard(
     card.y + 62,
   );
 
-  ctx.fillStyle = INK;
+  ctx.fillStyle = palette.bgMid;
   roundedRect(ctx, countX, countY, countWidth, countHeight, capRadius);
   ctx.fill();
 
@@ -492,13 +466,13 @@ function drawCard(
   const countBaseline =
     countY + countHeight / 2 + (ascent - descent) / 2;
   setFont(ctx, countFontSize, 700);
-  ctx.fillStyle = LIME;
+  ctx.fillStyle = palette.accent;
   ctx.textAlign = 'center';
   ctx.fillText(countText, countX + countWidth / 2, countBaseline);
 
   // 分隔线跟着胶囊底部走，胶囊变高时也不会被压住。
   const dividerY = Math.max(card.y + 78, countY + countHeight + 12);
-  ctx.strokeStyle = 'rgba(14, 42, 31, 0.08)';
+  ctx.strokeStyle = palette.cardLine;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(card.x + padding, dividerY);
@@ -514,30 +488,30 @@ function drawCard(
     if (!player) {
       roundedRect(ctx, cell.x, cell.y, cell.w, cell.h, 12);
       ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = 'rgba(14, 42, 31, 0.16)';
+      ctx.strokeStyle = palette.cardLine;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([]);
       setFont(ctx, 19, 500);
-      ctx.fillStyle = 'rgba(124, 132, 122, 0.7)';
+      ctx.fillStyle = palette.cardMuted;
       ctx.textAlign = 'center';
       ctx.fillText('空位', cell.x + cell.w / 2, cell.y + cell.h / 2 + 7);
       continue;
     }
 
-    ctx.fillStyle = player.isFemale ? CELL_FILL_FEMALE : CELL_FILL;
+    ctx.fillStyle = player.isFemale ? palette.cellFemale : palette.cellFill;
     roundedRect(ctx, cell.x, cell.y, cell.w, cell.h, 12);
     ctx.fill();
 
     if (player.isFemale) {
-      ctx.strokeStyle = CELL_STROKE_FEMALE;
+      ctx.strokeStyle = palette.cellFemaleLine;
       ctx.lineWidth = 1.2;
       roundedRect(ctx, cell.x, cell.y, cell.w, cell.h, 12);
       ctx.stroke();
     }
 
     setFont(ctx, 18, 600);
-    ctx.fillStyle = CARD_MUTED;
+    ctx.fillStyle = palette.cardMuted;
     ctx.textAlign = 'left';
     ctx.fillText(
       String(index + 1).padStart(2, '0'),
@@ -551,13 +525,13 @@ function drawCard(
     const name = fitName(ctx, player.name, nameMax);
 
     setFont(ctx, name.size, 700);
-    ctx.fillStyle = CARD_TEXT;
+    ctx.fillStyle = palette.cardText;
     const baseline = cell.y + cell.h / 2 + name.size * 0.35;
     ctx.fillText(name.text, nameX, baseline);
     const nameWidth = ctx.measureText(name.text).width;
 
     if (showRoseBadge(player.name, player.isFemale)) {
-      drawRose(ctx, nameX + nameWidth + 4, baseline - 1, 21);
+      drawRose(ctx, palette, nameX + nameWidth + 4, baseline - 1, 21);
     }
   }
 }
@@ -566,6 +540,7 @@ function drawWaitlist(
   ctx: PosterCtx,
   data: PosterData,
   layout: PosterLayout,
+  palette: PosterPalette,
 ): void {
   const waitlist = layout.waitlist;
   if (!waitlist || data.waitlist.length === 0) return;
@@ -574,22 +549,22 @@ function drawWaitlist(
   ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
   ctx.shadowBlur = 18;
   ctx.shadowOffsetY = 6;
-  ctx.fillStyle = CREAM;
+  ctx.fillStyle = palette.cardFill;
   roundedRect(ctx, waitlist.x, waitlist.y, waitlist.w, waitlist.h, 22);
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = LIME;
+  ctx.fillStyle = palette.accent;
   roundedRect(ctx, waitlist.x + 24, waitlist.y + 24, 8, 30, 4);
   ctx.fill();
 
   setFont(ctx, 32, 800);
-  ctx.fillStyle = CARD_TEXT;
+  ctx.fillStyle = palette.cardText;
   ctx.textAlign = 'left';
   ctx.fillText('后补名单', waitlist.x + 46, waitlist.y + 48);
 
   setFont(ctx, 24, 600);
-  ctx.fillStyle = CARD_MUTED;
+  ctx.fillStyle = palette.cardMuted;
   ctx.textAlign = 'right';
   ctx.fillText(
     `${data.waitlist.length} 人`,
@@ -601,19 +576,19 @@ function drawWaitlist(
     const cell = waitlist.cells[index];
     if (!cell) return;
 
-    ctx.fillStyle = player.isFemale ? CELL_FILL_FEMALE : CELL_FILL;
+    ctx.fillStyle = player.isFemale ? palette.cellFemale : palette.cellFill;
     roundedRect(ctx, cell.x, cell.y, cell.w, cell.h, 9);
     ctx.fill();
 
     if (player.isFemale) {
-      ctx.strokeStyle = CELL_STROKE_FEMALE;
+      ctx.strokeStyle = palette.cellFemaleLine;
       ctx.lineWidth = 1.2;
       roundedRect(ctx, cell.x, cell.y, cell.w, cell.h, 9);
       ctx.stroke();
     }
 
     setFont(ctx, 15, 600);
-    ctx.fillStyle = CARD_MUTED;
+    ctx.fillStyle = palette.cardMuted;
     ctx.textAlign = 'left';
     ctx.fillText(
       String(index + 1).padStart(2, '0'),
@@ -626,12 +601,12 @@ function drawWaitlist(
     const nameMax = cell.w - 44 - roseSpace;
     const name = fitName(ctx, player.name, nameMax);
     setFont(ctx, Math.min(name.size, 25), 700);
-    ctx.fillStyle = CARD_TEXT;
+    ctx.fillStyle = palette.cardText;
     const baseline = cell.y + cell.h / 2 + Math.min(name.size, 25) * 0.34;
     ctx.fillText(name.text, nameX, baseline);
 
     if (showRoseBadge(player.name, player.isFemale)) {
-      drawRose(ctx, nameX + ctx.measureText(name.text).width + 3, baseline - 1, 17);
+      drawRose(ctx, palette, nameX + ctx.measureText(name.text).width + 3, baseline - 1, 17);
     }
   });
 }
@@ -640,32 +615,33 @@ function drawNotice(
   ctx: PosterCtx,
   data: PosterData,
   layout: PosterLayout,
+  palette: PosterPalette,
 ): void {
   const notice = layout.notice;
   const text =
     data.notice.trim().replace(/\s+/g, ' ') ||
     '两上两下，合理串场，不允许打架，停车免费。';
 
-  ctx.fillStyle = '#e9f2c8';
+  ctx.fillStyle = palette.noticeFill;
   roundedRect(ctx, notice.x, notice.y, notice.w, notice.h, 20);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(155, 182, 52, 0.28)';
+  ctx.strokeStyle = palette.noticeLine;
   ctx.lineWidth = 1.5;
   roundedRect(ctx, notice.x, notice.y, notice.w, notice.h, 20);
   ctx.stroke();
 
-  ctx.fillStyle = INK;
+  ctx.fillStyle = palette.bgMid;
   roundedRect(ctx, notice.x + 24, notice.y + 26, 6, 26, 3);
   ctx.fill();
 
   setFont(ctx, 19, 800);
-  ctx.fillStyle = CARD_MUTED;
+  ctx.fillStyle = palette.cardMuted;
   ctx.textAlign = 'left';
   ctx.fillText('球局提示', notice.x + 44, notice.y + 45);
 
   setFont(ctx, 26, 600);
-  ctx.fillStyle = CARD_TEXT;
+  ctx.fillStyle = palette.cardText;
   const lines = wrapChars(ctx, text, notice.w - 68, 2).lines;
   lines.forEach((line, index) => {
     ctx.fillText(line, notice.x + 44, notice.y + 76 + index * 30);
@@ -676,10 +652,11 @@ function drawFooter(
   ctx: PosterCtx,
   data: PosterData,
   layout: PosterLayout,
+  palette: PosterPalette,
 ): void {
   const { footer, padding, width } = layout;
 
-  ctx.strokeStyle = 'rgba(247, 243, 230, 0.13)';
+  ctx.strokeStyle = palette.bgLine;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(padding, footer.dividerY);
@@ -692,7 +669,7 @@ function drawFooter(
       : `每组 ${data.capacity} 人`;
 
   setFont(ctx, 29, 600);
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.82)';
+  ctx.fillStyle = palette.onBgMuted;
   ctx.textAlign = 'left';
   ctx.fillText(
     `共 ${data.totalPlayers} 人 · ${data.groups.length} 场 · ${waitlistText}`,
@@ -707,18 +684,20 @@ function drawFooter(
   setFont(ctx, roseSize, 400, EMOJI_FONT);
   const roseWidth = ctx.measureText('🌹').width;
   const right = width - padding;
-  drawRose(ctx, right - femaleWidth - roseWidth - 4, footer.statsY - 1, roseSize);
+  drawRose(ctx, palette, right - femaleWidth - roseWidth - 4, footer.statsY - 1, roseSize);
   setFont(ctx, 27, 600);
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.82)';
+  ctx.fillStyle = palette.onBgMuted;
   ctx.textAlign = 'left';
   ctx.fillText(femaleText, right - femaleWidth, footer.statsY);
 
   setFont(ctx, 18, 600);
-  ctx.fillStyle = 'rgba(217, 243, 107, 0.55)';
+  ctx.fillStyle = palette.accent;
+  ctx.globalAlpha = 0.55;
   ctx.fillText('SHUTTLE SIX · 羽球分组', padding, footer.brandY);
+  ctx.globalAlpha = 1;
 
   setFont(ctx, 18, 500);
-  ctx.fillStyle = 'rgba(247, 243, 230, 0.42)';
+  ctx.fillStyle = palette.onBgFaint;
   ctx.textAlign = 'right';
   ctx.fillText(formatNumericCN(data.date) || '', width - padding, footer.brandY);
 }
@@ -735,16 +714,19 @@ export function renderPoster(
   data: PosterData,
   layout: PosterLayout,
 ): void {
+  // 主题只影响海报，页面 UI 保持绿色品牌色不变
+  const palette = getTheme(data.themeId);
+
   ctx.clearRect(0, 0, layout.width, layout.height);
   ctx.textBaseline = 'alphabetic';
-  drawBackground(ctx, layout);
-  drawHeader(ctx, data, layout);
+  drawBackground(ctx, layout, palette);
+  drawHeader(ctx, data, layout, palette);
 
   data.groups.forEach((group, index) => {
-    drawCard(ctx, group, layout, index, data.capacity);
+    drawCard(ctx, group, layout, index, data.capacity, palette);
   });
 
-  drawWaitlist(ctx, data, layout);
-  drawNotice(ctx, data, layout);
-  drawFooter(ctx, data, layout);
+  drawWaitlist(ctx, data, layout, palette);
+  drawNotice(ctx, data, layout, palette);
+  drawFooter(ctx, data, layout, palette);
 }

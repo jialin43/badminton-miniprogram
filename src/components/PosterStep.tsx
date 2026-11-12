@@ -1,9 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import type { AppState, Player } from '@/types';
+import type { AppAction } from '@/state/reducer';
 import { buildPosterLayout } from '@/lib/poster-layout';
 import type { PosterData } from '@/lib/poster-render';
+import type { CanvasNode } from '@/lib/export';
 import {
   canvasToTempPath,
   openAlbumSetting,
@@ -15,18 +17,30 @@ import { useToast } from './Feedback';
 import { Icon } from './Icon';
 import { NoticeCard } from './NoticeCard';
 import { PosterCanvas } from './PosterCanvas';
+import { ThemePicker } from './ThemePicker';
 
 interface PosterStepProps {
   state: AppState;
+  dispatch: (action: AppAction) => void;
   onBack: () => void;
   onOpenSettings: () => void;
 }
 
 const CANVAS_ID = 'posterCanvas';
 
-export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
+export function PosterStep({
+  state,
+  dispatch,
+  onBack,
+  onOpenSettings,
+}: PosterStepProps) {
   const notify = useToast();
   const [busy, setBusy] = useState(false);
+  const canvasNodeRef = useRef<CanvasNode | null>(null);
+
+  const handleNodeReady = useCallback((node: CanvasNode | null) => {
+    canvasNodeRef.current = node;
+  }, []);
 
   const playerMap = useMemo(
     () => new Map(state.players.map((player) => [player.id, player])),
@@ -67,12 +81,20 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
       venue: state.event.venue,
       capacity: state.capacity,
       notice: state.event.notice,
+      themeId: state.themeId,
       groups,
       waitlist,
       totalPlayers,
       femaleCount,
     };
-  }, [playerMap, state.capacity, state.event, state.groups, state.unassignedIds]);
+  }, [
+    playerMap,
+    state.capacity,
+    state.event,
+    state.groups,
+    state.themeId,
+    state.unassignedIds,
+  ]);
 
   const layout = useMemo(
     () => buildPosterLayout(data.groups.length, data.waitlist.length),
@@ -85,7 +107,13 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
     setBusy(true);
 
     try {
-      const result = await saveCanvasToAlbum(CANVAS_ID);
+      const node = canvasNodeRef.current;
+      if (!node) {
+        notify('海报还在绘制中，请稍等一下再保存');
+        return;
+      }
+
+      const result = await saveCanvasToAlbum(CANVAS_ID, node);
 
       if (result.ok) {
         notify('已保存到相册');
@@ -103,7 +131,7 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
         if (res.confirm) {
           await openAlbumSetting();
         } else {
-          const path = await canvasToTempPath(CANVAS_ID);
+          const path = await canvasToTempPath(CANVAS_ID, node);
           await previewPoster(path);
         }
         return;
@@ -120,7 +148,7 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
   /** 预览大图，用户可以长按保存或转发。 */
   const handlePreview = useCallback(async () => {
     try {
-      const path = await canvasToTempPath(CANVAS_ID);
+      const path = await canvasToTempPath(CANVAS_ID, canvasNodeRef.current);
       await previewPoster(path);
     } catch {
       notify('预览失败，请稍后重试');
@@ -140,7 +168,12 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
           </Text>
         </View>
 
-        <PosterCanvas data={data} layout={layout} canvasId={CANVAS_ID} />
+        <PosterCanvas
+          data={data}
+          layout={layout}
+          canvasId={CANVAS_ID}
+          onNodeReady={handleNodeReady}
+        />
 
         <View className="poster-actions">
           <Button className="btn btn--dark btn--block" onClick={() => void handlePreview()}>
@@ -149,6 +182,11 @@ export function PosterStep({ state, onBack, onOpenSettings }: PosterStepProps) {
           </Button>
         </View>
       </View>
+
+      <ThemePicker
+        value={state.themeId}
+        onChange={(themeId) => dispatch({ type: 'SET_THEME', themeId })}
+      />
 
       <NoticeCard notice={state.event.notice} onEdit={onOpenSettings} />
 

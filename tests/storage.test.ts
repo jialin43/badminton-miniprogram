@@ -97,3 +97,25 @@ describe('hydrateState', () => {
     expect(hydrateState('nope')).toBeNull();
   });
 });
+
+describe('hydrateState · 海报主题', () => {
+  it('旧数据没有 themeId 时回落到默认主题', () => {
+    const state = hydrateState(rawState());
+    expect(state?.themeId).toBe('forest');
+  });
+
+  it('保留合法的 themeId', () => {
+    const state = hydrateState(rawState({ themeId: 'midnight' }));
+    expect(state?.themeId).toBe('midnight');
+  });
+
+  it('非法 themeId 回落到默认主题，不会把脏值带进状态', () => {
+    const state = hydrateState(rawState({ themeId: 'not-a-theme' }));
+    expect(state?.themeId).toBe('forest');
+  });
+
+  it('themeId 类型不对也回落', () => {
+    const state = hydrateState(rawState({ themeId: 123 }));
+    expect(state?.themeId).toBe('forest');
+  });
+});

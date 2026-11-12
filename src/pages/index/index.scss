@@ -2,14 +2,41 @@
    Hero 区
    ============================================================ */
 
+/*
+ * hero 顶部要让开微信胶囊按钮。
+ *
+ * 不能用 env(safe-area-inset-top)：那个值只反映状态栏/刘海，
+ * 而且大量安卓机型上是 0，胶囊依旧存在，STEP 标签就被压住了。
+ * 这里用 JS 实测的 --capsule-top / --capsule-height：
+ * 顶部内边距 = 胶囊底边 + 一点呼吸空间。
+ */
 .hero {
   background: linear-gradient(160deg, #0b241a 0%, #0e2a1f 55%, #143a2b 100%);
-  padding: calc(24rpx + env(safe-area-inset-top)) 32rpx 36rpx;
+  /*
+   * 顶部内边距由 JS 以行内样式注入精确 px（胶囊底边 + 呼吸空间）。
+   * 这里只留一个 rpx 兜底值，防止行内样式缺失时贴到屏幕最上沿。
+   */
+  padding: 140rpx 32rpx 36rpx;
   border-bottom-left-radius: 40rpx;
   border-bottom-right-radius: 40rpx;
   color: #f7f3e6;
   position: relative;
   overflow: hidden;
+}
+
+/* 分组页的紧凑 hero：标题/副标题收起，只留品牌条和步骤指示 */
+.hero--compact {
+  padding: 120rpx 32rpx 20rpx;
+  border-bottom-left-radius: 28rpx;
+  border-bottom-right-radius: 28rpx;
+}
+
+.hero--compact .hero-top {
+  margin-bottom: 16rpx;
+}
+
+.hero--compact .brand-name {
+  font-size: 34rpx;
 }
 
 .hero::after {
@@ -64,6 +91,12 @@
   color: rgba(217, 243, 107, 0.65);
 }
 
+/*
+ * STEP 标签。
+ * 它在胶囊下方单独一行，不用挤在同一行里躲胶囊，
+ * 右边界和胶囊右边界对齐（hero 右侧内边距 32rpx 本身已经让出，
+ * 这里再用 --capsule-right 微调，让它看起来和胶囊右侧齐平）。
+ */
 .step-chip {
   padding: 8rpx 22rpx;
   border-radius: 999rpx;
@@ -72,6 +105,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--lime);
+  flex-shrink: 0;
 }
 
 .hero-title {
@@ -1062,4 +1096,149 @@
   color: var(--muted-2);
   line-height: 1.6;
   margin-bottom: 24rpx;
+}
+
+/* ============================================================
+   拖拽
+   ------------------------------------------------------------
+   拖拽中禁用页面滚动，避免手指移动时页面跟着滚，
+   导致落点判定和视觉都对不上。
+   ============================================================ */
+
+/* 被拿起的卡片原地留一个淡出的占位，让人知道它从哪儿来 */
+.player-card.is-dragging {
+  opacity: 0.32;
+  background: var(--paper-deep);
+}
+
+/* 精确落在某人身上：这是“将要互换的对象”，给最强的高亮 */
+.player-card.is-drop-on {
+  background: var(--lime);
+  box-shadow: 0 0 0 4rpx var(--green), 0 8rpx 20rpx rgba(14, 42, 31, 0.18);
+  transform: scale(1.04);
+}
+
+.player-card.is-drop-on .player-name,
+.player-card.is-drop-on .player-order {
+  color: var(--ink);
+}
+
+/* 落点高亮：实线描边 + 轻微提亮，比整块变色更不抢眼 */
+.group-card.is-drop-target {
+  border-color: var(--green);
+  background: #f2f6ea;
+}
+
+.pool.is-drop-target {
+  background: #e8eede;
+  box-shadow: inset 0 0 0 3rpx var(--green);
+}
+
+/* 拖拽接管层：全屏覆盖，吃掉所有触摸，保证 touchend 一定能收到 */
+.drag-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  /* 背景透明但必须存在，否则接不到事件 */
+  background: transparent;
+}
+
+/* 跟随手指的浮动卡片 */
+.drag-ghost {
+  position: fixed;
+  z-index: 999;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: 14rpx 22rpx;
+  border-radius: 16rpx;
+  background: var(--ink);
+  box-shadow: 0 12rpx 32rpx rgba(14, 42, 31, 0.3);
+}
+
+.drag-ghost__name {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--lime);
+}
+
+/* ============================================================
+   滚动容器
+   ------------------------------------------------------------
+   页面本身不再滚动（.page 固定 100vh 且 overflow: hidden），
+   只有这一层 ScrollView 可以滚。好处是拖拽时能精确控制是否滚动，
+   不会和页面滚动条抢手势。
+   ============================================================ */
+
+.page-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 拖拽期间禁止滚动，防止手指移动时列表跟着走 */
+.page-content.is-drag-active {
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
+/* ============================================================
+   海报配色选择
+   ------------------------------------------------------------
+   只切换海报风格，页面本身的绿色品牌色不变。
+   ============================================================ */
+
+.theme-picker {
+  background: var(--paper);
+  border-radius: 28rpx;
+  padding: 24rpx;
+  margin: 20rpx 0;
+  box-shadow: 0 8rpx 24rpx rgba(14, 42, 31, 0.05);
+}
+
+.theme-picker__head {
+  margin-bottom: 18rpx;
+}
+
+.theme-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.theme-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 12rpx 20rpx 12rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--paper-deep);
+  border: 2rpx solid transparent;
+}
+
+/* 选中态：描边 + 提亮，克制一点，别抢海报的视觉焦点 */
+.theme-item.is-active {
+  background: rgba(217, 243, 107, 0.22);
+  border-color: var(--green);
+}
+
+.theme-dot {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 2rpx rgba(14, 42, 31, 0.12);
+}
+
+.theme-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.theme-hint {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 21rpx;
+  color: var(--muted-2);
 }

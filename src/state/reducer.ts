@@ -19,6 +19,7 @@ import {
 } from '../lib/grouping';
 import { todayISO } from '../lib/date';
 import { nameKey, type EventHints } from '../lib/parser';
+import { DEFAULT_THEME_ID, getTheme } from '../lib/poster-theme';
 import { uid } from '../lib/id';
 
 const DEFAULT_TITLE = '本周羽毛球分组';
@@ -55,6 +56,7 @@ export type AppAction =
   | { type: 'CLEAR_GROUPS' }
   | { type: 'UNDO' }
   | { type: 'SET_EVENT'; event: EventInfo }
+  | { type: 'SET_THEME'; themeId: string }
   | { type: 'ADD_GROUP' }
   | { type: 'RENAME_GROUP'; id: string; label: string }
   | { type: 'REMOVE_GROUP'; id: string }
@@ -78,6 +80,7 @@ export function createInitialState(now = Date.now()): AppState {
       notice: DEFAULT_NOTICE,
     },
     capacity: CAPACITY,
+    themeId: DEFAULT_THEME_ID,
     report: null,
     past: [],
     updatedAt: now,
@@ -431,6 +434,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         },
         updatedAt: Date.now(),
       };
+
+    case 'SET_THEME': {
+      // 只接受已知主题，避免脏值写进存储
+      const theme = getTheme(action.themeId);
+      if (state.themeId === theme.id) return state;
+      return { ...state, themeId: theme.id, updatedAt: Date.now() };
+    }
 
     case 'ADD_GROUP': {
       if (state.groups.length >= MAX_GROUPS) return state;

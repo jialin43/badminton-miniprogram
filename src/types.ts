@@ -74,6 +74,8 @@ export interface AppState {
   unassignedIds: string[];
   event: EventInfo;
   capacity: number;
+  /** 海报主题 id，只影响海报配色 */
+  themeId: string;
   report: ImportReport | null;
   past: GroupSnapshot[];
   updatedAt: number;
@@ -88,6 +90,7 @@ export interface PersistedState {
   unassignedIds: string[];
   event: EventInfo;
   capacity: number;
+  themeId: string;
   report: ImportReport | null;
   updatedAt: number;
 }

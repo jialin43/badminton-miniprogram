@@ -3,6 +3,18 @@ import { useState } from 'react';
 import type { Group, Player } from '@/types';
 import { PlayerCard } from './PlayerCard';
 
+type TouchLike = {
+  touches?: Array<{ clientX: number; clientY: number }>;
+  changedTouches?: Array<{ clientX: number; clientY: number }>;
+};
+
+/** 拖拽回调，原样透传给每张成员卡 */
+export interface DragHandlers {
+  onDragStart?: (playerId: string, event: TouchLike) => void;
+  onDragMove?: (event: TouchLike) => void;
+  onDragEnd?: (event: TouchLike) => void;
+}
+
 interface GroupCardProps {
   group: Group;
   players: Player[];
@@ -10,6 +22,13 @@ interface GroupCardProps {
   onOpenMove: (playerId: string) => void;
   onRename: (id: string, label: string) => void;
   onRemove: (id: string) => void;
+  dragHandlers?: DragHandlers;
+  /** 正在被拖动的成员 id */
+  draggingId?: string | null;
+  /** 当前拖拽悬停在该场次上 */
+  dropActive?: boolean;
+  /** 当前拖拽精确悬停的成员 id（用于显示互换高亮） */
+  dropOnPlayerId?: string | null;
 }
 
 export function GroupCard({
@@ -19,6 +38,10 @@ export function GroupCard({
   onOpenMove,
   onRename,
   onRemove,
+  dragHandlers,
+  draggingId,
+  dropActive,
+  dropOnPlayerId,
 }: GroupCardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(group.label);
@@ -41,7 +64,7 @@ export function GroupCard({
     <View
       className={`group-card ${isFull ? 'is-full' : ''} ${
         isIncomplete ? 'is-incomplete' : ''
-      }`}
+      } ${dropActive ? 'is-drop-target' : ''}`}
     >
       <View className="group-head">
         <View className="group-title-wrap">
@@ -86,6 +109,11 @@ export function GroupCard({
               player={player}
               index={index}
               onOpenMove={onOpenMove}
+              dragging={draggingId === player.id}
+              dropOn={dropOnPlayerId === player.id}
+              onDragStart={dragHandlers?.onDragStart}
+              onDragMove={dragHandlers?.onDragMove}
+              onDragEnd={dragHandlers?.onDragEnd}
             />
           ) : (
             <View className="empty-slot" key={`empty-${index}`}>

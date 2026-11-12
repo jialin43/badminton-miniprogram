@@ -3,10 +3,13 @@ import { Button, Text, View } from '@tarojs/components';
 import type { AppState, Player } from '@/types';
 import type { AppAction } from '@/state/reducer';
 import { formatFullCN, formatTimeRange } from '@/lib/date';
-import { groupCountFor } from '@/lib/grouping';
+import { groupCountFor, locatePlayer } from '@/lib/grouping';
+import { useDragDrop } from '@/hooks/useDragDrop';
+import type { DropTarget } from '@/hooks/useDragDrop';
 import { ActionBar } from './ActionBar';
 import { useConfirm, useToast } from './Feedback';
 import { GroupCard } from './GroupCard';
+import type { DragHandlers } from './GroupCard';
 import { Icon } from './Icon';
 import { MoveSheet } from './MoveSheet';
 import { NoticeCard } from './NoticeCard';
@@ -18,6 +21,8 @@ interface GroupStepProps {
   onBack: () => void;
   onNext: () => void;
   onOpenSettings: () => void;
+  /** 通知父级：正在拖拽，需要暂停列表滚动 */
+  onDraggingChange?: (dragging: boolean) => void;
 }
 
 export function GroupStep({
@@ -26,6 +31,7 @@ export function GroupStep({
   onBack,
   onNext,
   onOpenSettings,
+  onDraggingChange,
 }: GroupStepProps) {
   const notify = useToast();
   const confirm = useConfirm();
@@ -146,6 +152,96 @@ export function GroupStep({
     notify(`${source} 与 ${target} 已互换`);
   };
 
+  /**
+   * 拖拽：松手时把成员移动到落点场次 / 后补区。
+   *
+   * 目标场次已满时自动改为“与场末成员互换”，
+   * 这样把 A 组的人拖到满员的 B 组也有确定结果，不用再点面板。
+   */
+  const handleDrop = (playerId: string, target: DropTarget) => {
+    const player = playerMap.get(playerId);
+    if (!player) return;
+
+    const from = locatePlayer(state.groups, state.unassignedIds, playerId);
+
+    // ① 落在某个具体成员身上 → 与这个人互换
+    if (target.playerId && target.playerId !== playerId) {
+      const mate = playerMap.get(target.playerId);
+      if (!mate) return;
+
+      const mateLoc = locatePlayer(
+        state.groups,
+        state.unassignedIds,
+        target.playerId,
+      );
+
+      // 同场次内互换位置没有意义，给个明确提示，别让用户以为拖失败了
+      if (mateLoc && from && mateLoc.groupId === from.groupId) {
+        notify(`同一场次内不用互换，换到别的场次才有意义`);
+        return;
+      }
+
+      dispatch({
+        type: 'SWAP_PLAYER',
+        sourceId: playerId,
+        targetId: target.playerId,
+      });
+      notify(`${player.name} 与 ${mate.name} 已互换`);
+      return;
+    }
+
+    // ② 落在场次空白处 / 后补区
+    if (from && from.groupId === target.groupId) return;
+
+    if (target.groupId === null) {
+      dispatch({ type: 'MOVE_PLAYER', playerId, targetGroupId: null });
+      notify(`${player.name} 已移入后补名单`);
+      return;
+    }
+
+    const group = state.groups.find((entry) => entry.id === target.groupId);
+    if (!group) return;
+
+    if (group.playerIds.length >= state.capacity) {
+      // 已满且没点中具体的人：退化为与场末成员互换，避免“拖过去没反应”
+      const mateId = group.playerIds[group.playerIds.length - 1];
+      if (!mateId || mateId === playerId) return;
+
+      dispatch({ type: 'SWAP_PLAYER', sourceId: playerId, targetId: mateId });
+      const mate = playerMap.get(mateId)?.name ?? '';
+      notify(`${player.name} 与 ${mate} 已互换`);
+      return;
+    }
+
+    dispatch({ type: 'MOVE_PLAYER', playerId, targetGroupId: group.id });
+    notify(`${player.name} 已移动到 ${group.label}`);
+  };
+
+  const { drag, startDrag, moveDrag, endDrag } = useDragDrop({
+    onDrop: handleDrop,
+    onDraggingChange,
+    // 顺序必须与页面渲染顺序完全一致：
+    // 先后补区成员，再各场次成员，用于把量到的矩形映射回具体的人
+    layout: {
+      waitlistIds: state.unassignedIds,
+      groups: state.groups.map((group) => ({
+        id: group.id,
+        playerIds: group.playerIds,
+      })),
+    },
+    // 拖拽起不来时（例如落点量不到），退回点按移动，别让用户卡住
+    onFallback: setMovePlayerId,
+  });
+
+  // 透传给每张成员卡：touchmove/touchend 必须绑在卡片自身，靠父级冒泡会丢
+  const dragHandlers: DragHandlers = {
+    onDragStart: startDrag,
+    onDragMove: moveDrag,
+    onDragEnd: endDrag,
+  };
+
+  const dragPlayer = drag ? playerMap.get(drag.playerId) ?? null : null;
+
   const handleNext = async () => {
     if (fullGroups.length === 0) {
       notify(`还没有满 ${state.capacity} 人的场次，先凑满一场再生成`);
@@ -174,7 +270,11 @@ export function GroupStep({
   };
 
   return (
-    <View className="page-content page-content--with-bar">
+    <View
+      className={`page-content page-content--with-bar ${
+        drag ? 'is-drag-active' : ''
+      }`}
+    >
       <View className="event-strip">
         <View className="event-main">
           <Text className="section-kicker">MATCH INFO</Text>
@@ -239,7 +339,19 @@ export function GroupStep({
         </Button>
       </View>
 
-      <UnassignedPool players={waitlistPlayers} onOpenMove={setMovePlayerId} />
+      <UnassignedPool
+        players={waitlistPlayers}
+        onOpenMove={setMovePlayerId}
+        dragHandlers={dragHandlers}
+        draggingId={drag?.playerId ?? null}
+        // 命中具体成员时只高亮那一张卡，不再整块高亮，避免视觉噪音
+        dropActive={
+          drag?.over?.groupId === null && !drag?.over?.playerId
+        }
+        dropOnPlayerId={
+          drag?.over?.groupId === null ? (drag.over.playerId ?? null) : null
+        }
+      />
 
       <View className="groups-list">
         {state.groups.map((group) => {
@@ -258,6 +370,16 @@ export function GroupStep({
                 dispatch({ type: 'RENAME_GROUP', id, label })
               }
               onRemove={handleRemoveGroup}
+              dragHandlers={dragHandlers}
+              draggingId={drag?.playerId ?? null}
+              dropActive={
+                drag?.over?.groupId === group.id && !drag?.over?.playerId
+              }
+              dropOnPlayerId={
+                drag?.over?.groupId === group.id
+                  ? (drag.over.playerId ?? null)
+                  : null
+              }
             />
           );
         })}
@@ -292,6 +414,36 @@ export function GroupStep({
         onMove={handleMove}
         onSwapWith={handleSwap}
       />
+
+      {/*
+       * 拖拽接管层。
+       *
+       * 手指一抬起就渲染，覆盖整个屏幕，吃掉后续所有 touch 事件：
+       * - catchtouchmove 阻止 ScrollView 接管滚动（否则拖拽会被吞掉）
+       * - touchend 在这里一定能收到，不依赖卡片节点是否还在
+       * 这一层只在拖拽期间存在，不拖拽时完全不渲染，不影响正常滚动。
+       */}
+      {drag ? (
+        <View
+          className="drag-layer"
+          onTouchMove={moveDrag as never}
+          onTouchEnd={endDrag as never}
+          onTouchCancel={endDrag as never}
+          catchMove
+        >
+          <View
+            className="drag-ghost"
+            style={{
+              left: `${drag.x}px`,
+              top: `${drag.y}px`,
+            }}
+          >
+            <Text className="drag-ghost__name">
+              {dragPlayer?.name ?? ''}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       <ActionBar
         primaryLabel="生成海报"

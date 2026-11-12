@@ -23,6 +23,7 @@ import {
   todayISO,
 } from './date';
 import { groupLabel } from './grouping';
+import { getTheme } from './poster-theme';
 
 const DEFAULT_TITLE = '本周羽毛球分组';
 
@@ -219,6 +220,7 @@ export function hydrateState(raw: unknown): AppState | null {
     unassignedIds,
     event,
     capacity,
+    themeId: getTheme(typeof raw.themeId === 'string' ? raw.themeId : '').id,
     report,
     past: [],
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
@@ -235,6 +237,7 @@ export function toPersisted(state: AppState): PersistedState {
     unassignedIds: state.unassignedIds,
     event: state.event,
     capacity: state.capacity,
+    themeId: state.themeId,
     report: state.report,
     updatedAt: state.updatedAt,
   };

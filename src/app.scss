@@ -50,14 +50,26 @@ scroll-view {
    通用容器
    ============================================================ */
 
+/*
+  页面骨架：固定视口高度，滚动交给内部的 ScrollView。
+  原来用 min-height: 100vh + 页面级滚动，拖拽时手指一动整页就跟着滚，
+  和拖拽手势直接冲突。改成内部滚动后，页面本身不再有滚动条，
+  只有列表区域滚动，拖拽时可以用 catchtouchmove 把滚动彻底挡住。
+*/
 .page {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* 滚动容器：占满 hero 与 ActionBar 之间的剩余空间 */
+.page-scroll {
+  flex: 1;
+  min-height: 0;
 }
 
 .page-content {
-  flex: 1;
   padding: 0 24rpx;
 }
 
@@ -113,6 +125,13 @@ scroll-view {
   margin: 0;
   font-family: inherit;
   line-height: 1.2;
+}
+
+/* 微信原生 button 的 ::after 自带 1px 实线边框，
+   圆角下会露出四周黑边。这里对所有 button 统一清掉，
+   不再依赖每个按钮类各写一遍（容易漏）。 */
+button::after {
+  border: none;
 }
 
 .btn {
