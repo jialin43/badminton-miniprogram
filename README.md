@@ -23,23 +23,6 @@ npm run typecheck        # 类型检查
 > 注意：Taro 会把配置缓存写到用户主目录。若遇到 `EPERM: mkdir ~/.taro4.0`，
 > 用 `HOME="$(pwd)/.taro-home" npx taro build --type weapp` 绕过。
 
-## 上架前你需要做的事
-
-| 事项 | 说明 |
-| --- | --- |
-| 注册小程序 | [微信公众平台](https://mp.weixin.qq.com)，个人主体免费 |
-| 拿到 AppID | 设置 → 基本设置 → 账号信息，填进 `project.config.json` 的 `appid` |
-| 小程序备案 | **2023 年 9 月起强制**，需 1–3 周，建议最先启动 |
-| 选择类目 | 建议「工具 → 效率」 |
-| 名称与简介 | 如「羽六分组」，名称需查重 |
-| 隐私协议 | 后台「用户隐私保护指引」声明**不收集任何个人信息** |
-
-### 审核注意事项
-
-- 本工具**无需登录**，不要调用 `getUserProfile` 获取头像昵称，容易被拒。
-- 保存图片需要 `scope.writePhotosAlbum`，已在 `app.config.ts` 的 `permission` 中声明。
-- 分享通过 `onShareAppMessage` 实现，无需额外权限。
-- 接龙文本仅本地处理，不涉及用户内容上传，审核时说明清楚即可。
 
 ## 目录结构
 
